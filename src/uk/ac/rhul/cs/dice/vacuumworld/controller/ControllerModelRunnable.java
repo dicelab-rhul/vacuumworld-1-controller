@@ -1,10 +1,8 @@
 package uk.ac.rhul.cs.dice.vacuumworld.controller;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.net.Socket;
 import java.util.Queue;
 
@@ -15,24 +13,38 @@ public class ControllerModelRunnable implements Runnable {
 	private int modelPort;
 	private Queue<ViewRequest> viewRequests;
 	private Queue<ModelUpdate> modelUpdates;
-	private Socket connectionWithModel;
-	private InputStream input;
-	private ObjectInputStream i;
-	private OutputStream output;
-	private ObjectOutputStream o;
+	private Socket socketWithModel;
+	private ObjectInputStream fromModel;
+	private ObjectOutputStream toModel;
 	private boolean allRight;
 	
-	public ControllerModelRunnable(String modelIp, int modelPort, Queue<ViewRequest> viewRequests, Queue<ModelUpdate> modelUpdates) {
+	public ControllerModelRunnable(String modelIp, int modelPort, Queue<ViewRequest> viewRequests, Queue<ModelUpdate> modelUpdates) throws IOException {
 		this.modelIp = modelIp;
 		this.modelPort = modelPort;
 		this.viewRequests = viewRequests;
 		this.modelUpdates = modelUpdates;
+		this.allRight = true;
+	}
+	
+	public Socket getSocketWithModel() {
+		if(this.socketWithModel == null) {
+			return null;
+		}
+		else if(!this.socketWithModel.isConnected()) {
+			return null;
+		}
+		else {
+			return this.socketWithModel;
+		}
 	}
 
 	@Override
 	public void run() {
 		try {
-			connect();
+			this.socketWithModel = Handshake.attemptHandshakeWithModel(this.modelIp, this.modelPort);
+			this.fromModel = new ObjectInputStream(this.socketWithModel.getInputStream());
+			this.toModel = new ObjectOutputStream(this.socketWithModel.getOutputStream());
+			
 			doJob();
 		}
 		catch (Exception e) {
@@ -44,10 +56,11 @@ public class ControllerModelRunnable implements Runnable {
 		while(this.allRight) {
 			if(!this.viewRequests.isEmpty()) {
 				ViewRequest request = this.viewRequests.poll();
-				this.o.writeObject(request);
+				this.toModel.writeObject(request);
+				this.toModel.flush();
 			}
 			
-			this.modelUpdates.add((ModelUpdate) this.i.readObject());
+			this.modelUpdates.add((ModelUpdate) this.fromModel.readObject());
 		}
 	}
 
@@ -56,32 +69,10 @@ public class ControllerModelRunnable implements Runnable {
 		this.allRight = false;
 		
 		try {
-			this.connectionWithModel.close();
+			this.socketWithModel.close();
 		}
 		catch(Exception ex) {
 			Utils.log("Socket already closed.", ex);
 		}
-	}
-
-	private void connect() throws IOException {
-		if(!checkConnected()) {
-			this.connectionWithModel = new Socket(this.modelIp, this.modelPort);
-			this.input = this.connectionWithModel.getInputStream();
-			this.output = this.connectionWithModel.getOutputStream();
-			this.i = new ObjectInputStream(this.input);
-			this.o = new ObjectOutputStream(this.output);
-			this.allRight = true;
-		}	
-	}
-
-	private boolean checkConnected() {
-		if(this.connectionWithModel == null) {
-			return false;
-		}
-		else if(this.connectionWithModel.isConnected()) {
-			return true;
-		}
-		
-		return false;
 	}
 }

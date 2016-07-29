@@ -1,5 +1,7 @@
 package uk.ac.rhul.cs.dice.vacuumworld.controller;
 
+import java.io.IOException;
+
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
 
 public class Main {
@@ -24,7 +26,7 @@ public class Main {
 		}
 	}
 
-	private static void startControllerServer(String modelIp, int modelPort) {
+	private static void startControllerServer(String modelIp, int modelPort) throws IOException {
 		ControllerServer.getInstance(modelIp, modelPort);
 		ControllerServer.startControllerServer();
 	}

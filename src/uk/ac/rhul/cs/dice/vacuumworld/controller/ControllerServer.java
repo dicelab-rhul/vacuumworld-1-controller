@@ -1,5 +1,7 @@
 package uk.ac.rhul.cs.dice.vacuumworld.controller;
 
+import java.io.IOException;
+import java.net.Socket;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ControllerServer {
@@ -24,14 +26,19 @@ public class ControllerServer {
 		return instance;
 	}
 	
-	public static void startControllerServer() {
-		ViewControllerRunnable viewControllerRunnable = new ViewControllerRunnable(viewRequests, modelUpdates);
+	public static void startControllerServer() throws IOException {		
 		ControllerModelRunnable controllerModelRunnable = new ControllerModelRunnable(modelIp, modelPort, viewRequests, modelUpdates);
-		
-		Thread viewControllerThread = new Thread(viewControllerRunnable);
 		Thread controllerModelThread = new Thread(controllerModelRunnable);
-		
-		viewControllerThread.start();
 		controllerModelThread.start();
+		
+		Socket socketWithModel = null;
+		
+		while(socketWithModel == null) {
+			socketWithModel = controllerModelRunnable.getSocketWithModel();
+		}
+		
+		ViewControllerRunnable viewControllerRunnable = new ViewControllerRunnable(socketWithModel, viewRequests, modelUpdates);
+		Thread viewControllerThread = new Thread(viewControllerRunnable);
+		viewControllerThread.start();
 	}
 }

@@ -4,7 +4,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Utils {
-	
+	public static final String MODEL_IP = "127.0.0.1";
+	public static final int MODEL_PORT = 10890;
 	private static final Logger LOGGER = Logger.getGlobal();
 	
 	private Utils(){}
