@@ -6,6 +6,8 @@ import java.util.logging.Logger;
 public class Utils {
 	public static final String MODEL_IP = "127.0.0.1";
 	public static final int MODEL_PORT = 10890;
+	public static final String CONTROLLER_IP = "127.0.0.1";
+	public static final int CONTROLLER_PORT = 1890;
 	private static final Logger LOGGER = Logger.getGlobal();
 	
 	private Utils(){}
