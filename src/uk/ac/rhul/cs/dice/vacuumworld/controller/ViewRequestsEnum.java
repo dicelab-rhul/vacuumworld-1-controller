@@ -1,5 +1,5 @@
 package uk.ac.rhul.cs.dice.vacuumworld.controller;
 
 public enum ViewRequestsEnum {
-	LOAD_TEMPLATE, MOVE_OBSTACLE, STOP;
+	NEW, LOAD_TEMPLATE, LOAD_TEMPLATE_FROM_FILE, GET_STATE, MOVE_OBSTACLE, STOP;
 }
