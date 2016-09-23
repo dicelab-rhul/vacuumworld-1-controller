@@ -5,8 +5,8 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.Queue;
 
-import uk.ac.rhul.cs.dice.vacuumworld.controller.ViewRequest;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
+import uk.ac.rhul.cs.dice.vacuumworld.view.ViewRequest;
 
 public class ModelOutgoingManagerRunnable implements Runnable {
 	private Queue<ViewRequest> viewRequests;
@@ -14,9 +14,9 @@ public class ModelOutgoingManagerRunnable implements Runnable {
 	private ObjectOutputStream toModel;
 	private boolean allRight;
 	
-	public ModelOutgoingManagerRunnable(Socket socketWithModel, Queue<ViewRequest> viewRequests) throws IOException {
+	public ModelOutgoingManagerRunnable(Socket socketWithModel, ObjectOutputStream toModel, Queue<ViewRequest> viewRequests) throws IOException {
 		this.socketWithModel = socketWithModel;
-		this.toModel = new ObjectOutputStream(this.socketWithModel.getOutputStream());
+		this.toModel = toModel;
 		this.viewRequests = viewRequests;
 		this.allRight = true;
 	}

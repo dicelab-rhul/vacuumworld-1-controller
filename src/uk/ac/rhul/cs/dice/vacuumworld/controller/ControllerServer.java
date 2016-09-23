@@ -2,6 +2,7 @@ package uk.ac.rhul.cs.dice.vacuumworld.controller;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -14,6 +15,8 @@ import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeCodes;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeException;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.DeadThreadException;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
+import uk.ac.rhul.cs.dice.vacuumworld.view.ModelUpdate;
+import uk.ac.rhul.cs.dice.vacuumworld.view.ViewRequest;
 
 public class ControllerServer {
 	private static ControllerServer instance;
@@ -22,7 +25,11 @@ public class ControllerServer {
 	private static ConcurrentLinkedQueue<ViewRequest> viewRequests;
 	private static ConcurrentLinkedQueue<ModelUpdate> modelUpdates;
 	private static Socket socketWithView;
+	private static ObjectOutputStream toViewStream;
+	private static ObjectInputStream fromViewStream;
 	private static Socket socketWithModel;
+	private static ObjectOutputStream toModelStream;
+	private static ObjectInputStream fromModelStream;
 	private static ServerSocket server;
 	private static boolean started;
 	
@@ -96,10 +103,10 @@ public class ControllerServer {
 	}
 
 	private static void startManagers() throws IOException {
-		fromView = new ViewIncomingManagerRunnable(socketWithView, viewRequests);
-		toView = new ViewOutoingManagerRunnable(socketWithView, modelUpdates);
-		fromModel = new ModelIncomingManagerRunnable(socketWithModel, modelUpdates);
-		toModel = new ModelOutgoingManagerRunnable(socketWithModel, viewRequests);
+		fromView = new ViewIncomingManagerRunnable(socketWithView, fromViewStream, viewRequests);
+		toView = new ViewOutoingManagerRunnable(socketWithView, toViewStream, modelUpdates);
+		fromModel = new ModelIncomingManagerRunnable(socketWithModel, fromModelStream, modelUpdates);
+		toModel = new ModelOutgoingManagerRunnable(socketWithModel, toModelStream, viewRequests);
 		
 		createAndStartThreads();
 	}
@@ -126,7 +133,7 @@ public class ControllerServer {
 				waitForViewConnection();
 				
 			}
-			else if(socketWithModel.isClosed()) {
+			else if(socketWithView.isClosed()) {
 				waitForViewConnection();
 			}
 		}
@@ -136,27 +143,48 @@ public class ControllerServer {
 	}
 
 	private static void waitForViewConnection() throws IOException, ClassNotFoundException, HandshakeException {
-		socketWithView = server.accept();
-		Object code = new ObjectInputStream(socketWithView.getInputStream()).readObject();
+		System.out.println("Waiting for view...");
+		Socket socket = server.accept();
+		ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
+		ObjectInputStream input = new ObjectInputStream(socket.getInputStream());
 		
-		if(!(code instanceof HandshakeCodes)) {
+		HandshakeCodes code = HandshakeCodes.fromString((String) input.readObject());
+		System.out.println("received " + (code == null ? null : code.toString()) + " from view");
+		
+		if(code == null) {
 			throw new IllegalArgumentException("Bad handshake.");
 		}
 		
-		socketWithView = Handshake.attemptHandshakeWithView(socketWithView, socketWithModel, (HandshakeCodes) code, modelIp, modelPort);
+		if(Handshake.attemptHandshakeWithView(toModelStream, fromModelStream, output, code)) {
+			socketWithView = socket;
+			toViewStream = output;
+			fromViewStream = input;
+		}
 	}
 
 	private static void connectWithModelIfNecessary() {
 		try {
 			if(socketWithModel == null) {
-				socketWithModel = Handshake.attemptHandshakeWithModel(modelIp, modelPort);
+				tryHandshake();
 			}
 			else if(socketWithModel.isClosed()) {
-				socketWithModel = Handshake.attemptHandshakeWithModel(modelIp, modelPort);
+				tryHandshake();
 			}
 		}
 		catch(Exception e) {
 			return;
+		}
+	}
+
+	private static void tryHandshake() throws IOException, HandshakeException {
+		Socket socket = new Socket(modelIp, modelPort);
+		ObjectOutputStream o = new ObjectOutputStream(socket.getOutputStream());
+		ObjectInputStream i = new ObjectInputStream(socket.getInputStream());
+		
+		if(Handshake.attemptHandshakeWithModel(o, i)) {
+			socketWithModel = socket;
+			toModelStream = o;
+			fromModelStream = i;
 		}
 	}
 }

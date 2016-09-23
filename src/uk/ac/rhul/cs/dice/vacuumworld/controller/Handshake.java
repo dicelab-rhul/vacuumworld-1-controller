@@ -3,7 +3,6 @@ package uk.ac.rhul.cs.dice.vacuumworld.controller;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -14,56 +13,58 @@ import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeException;
 
 public class Handshake {
 	private static final String ERROR = "Bad handshake.";
-	private static final int TIME_TO_WAIT = 10000;
+	private static final int TIME_TO_WAIT = 100000;
 	
 	private Handshake(){}
 	
-	public static Socket attemptHandshakeWithModel(String modelIp, int modelPort) throws HandshakeException {
+	public static Boolean attemptHandshakeWithModel(ObjectOutputStream toModel, ObjectInputStream fromModel) throws HandshakeException {
 		ExecutorService executor = Executors.newSingleThreadExecutor();
-		Future<Socket> future = executor.submit(() -> doHandshakeWithModel(modelIp, modelPort));
+		Future<Boolean> future = executor.submit(() -> doHandshakeWithModel(toModel, fromModel));
 		
 		try {
 			return future.get(TIME_TO_WAIT, TimeUnit.MILLISECONDS);
 		}
 		catch (Exception e) {
+			e.printStackTrace();
 			throw new HandshakeException(e);
 		}
 	}
 	
-	private static Socket doHandshakeWithModel(String modelIp, int modelPort) throws IOException, ClassNotFoundException {
-		Socket modelSocket = new Socket(modelIp, modelPort);
+	/*private static Boolean doHandshakeWithModel(ObjectOutputStream toModel, ObjectInputStream fromModel) throws IOException, ClassNotFoundException {
 		ObjectOutputStream toModel = new ObjectOutputStream(modelSocket.getOutputStream());
 		ObjectInputStream fromModel = new ObjectInputStream(modelSocket.getInputStream());
 		
 		return doHandshakeWithModel(modelSocket, toModel, fromModel);
-	}
+	}*/
 	
-	private static Socket doHandshakeWithModel(Socket modelSocket, ObjectOutputStream toModel, ObjectInputStream fromModel) throws IOException, ClassNotFoundException {
-		toModel.writeObject(HandshakeCodes.CHCM);
+	private static Boolean doHandshakeWithModel(ObjectOutputStream toModel, ObjectInputStream fromModel) throws IOException, ClassNotFoundException {
+		toModel.writeObject(HandshakeCodes.CHCM.toString());
 		toModel.flush();
+		System.out.println("sent CHCM to model");
 		
-		Object response = fromModel.readObject();
+		HandshakeCodes response = HandshakeCodes.fromString((String) fromModel.readObject());
+		System.out.println("received " + (response == null ? null : response.toString()) + " from model"); //MHMC
 		
-		if(response instanceof HandshakeCodes) {
-			return finalizeHandshakeWithModel(modelSocket, (HandshakeCodes) response);
+		if(response != null) {
+			return finalizeHandshakeWithModel(response);
 		}
 		else {
 			throw new IOException(ERROR);
 		}
 	}
 
-	private static Socket finalizeHandshakeWithModel(Socket modelSocket, HandshakeCodes response) {
+	private static Boolean finalizeHandshakeWithModel(HandshakeCodes response) {
 		if(HandshakeCodes.MHMC.equals(response)) {
-			return modelSocket;
+			return true;
 		}
 		else {
 			throw new IllegalArgumentException(ERROR);
 		}
 	}
 
-	public static Socket attemptHandshakeWithView(Socket viewSocket, Socket mSocket, HandshakeCodes codeFromView, String modelIp, int modelPort) throws HandshakeException {
+	public static Boolean attemptHandshakeWithView(ObjectOutputStream toModel, ObjectInputStream fromModel, ObjectOutputStream toView, HandshakeCodes codeFromView) throws HandshakeException {
 		ExecutorService executor = Executors.newSingleThreadExecutor();
-		Future<Socket> future = executor.submit(() -> doHandshakeWithView(viewSocket, mSocket, codeFromView, modelIp, modelPort));
+		Future<Boolean> future = executor.submit(() -> doHandshakeWithView(toModel, fromModel, toView, codeFromView));
 		
 		try {
 			return future.get(TIME_TO_WAIT, TimeUnit.MILLISECONDS);
@@ -73,7 +74,7 @@ public class Handshake {
 		}
 	}
 	
-	private static Socket doHandshakeWithView(Socket viewSocket, Socket mSocket, HandshakeCodes codeFromView, String modelIp, int modelPort) throws IOException, ClassNotFoundException {
+	/*private static Socket doHandshakeWithView(Socket viewSocket, Socket mSocket, HandshakeCodes codeFromView, String modelIp, int modelPort) throws IOException, ClassNotFoundException {
 		Socket modelSocket = getModelSocket(mSocket, modelIp, modelPort);
 		
 		ObjectOutputStream toView = new ObjectOutputStream(viewSocket.getOutputStream());
@@ -93,43 +94,48 @@ public class Handshake {
 		else {
 			return mSocket;
 		}
-	}
+	}*/
 
-	private static Socket doHandshakeWithView(Socket viewSocket, HandshakeCodes codeFromView, ObjectOutputStream toView, ObjectOutputStream toModel, ObjectInputStream fromModel) throws IOException, ClassNotFoundException {
+	private static Boolean doHandshakeWithView(ObjectOutputStream toModel, ObjectInputStream fromModel, ObjectOutputStream toView, HandshakeCodes codeFromView) throws IOException, ClassNotFoundException {
 		if(HandshakeCodes.VHVC.equals(codeFromView)) {
-			return doHandshakeWithView(viewSocket, toView, toModel, fromModel);
+			return doHandshakeWithView(toView, toModel, fromModel);
 		}
 		else {
 			throw new IllegalArgumentException(ERROR);
 		}
 	}
 
-	private static Socket doHandshakeWithView(Socket viewSocket, ObjectOutputStream toView, ObjectOutputStream toModel, ObjectInputStream fromModel) throws IOException, ClassNotFoundException {
-		toView.writeObject(HandshakeCodes.CHCV);
+	private static Boolean doHandshakeWithView(ObjectOutputStream toView, ObjectOutputStream toModel, ObjectInputStream fromModel) throws IOException, ClassNotFoundException {
+		toView.writeObject(HandshakeCodes.CHCV.toString());
 		toView.flush();
-		toModel.writeObject(HandshakeCodes.CHVM);
-		toModel.flush();
+		System.out.println("sent CHCV to view");
 		
-		return doHandshakeWithView(viewSocket, toView, fromModel);
+		toModel.writeObject(HandshakeCodes.CHVM.toString());
+		toModel.flush();
+		System.out.println("sent CHVM to model");
+		
+		return doHandshakeWithView(toView, fromModel);
 	}
 
-	private static Socket doHandshakeWithView(Socket viewSocket, ObjectOutputStream toView, ObjectInputStream fromModel) throws ClassNotFoundException, IOException {
-		Object response = fromModel.readObject();
+	private static Boolean doHandshakeWithView(ObjectOutputStream toView, ObjectInputStream fromModel) throws ClassNotFoundException, IOException {
+		HandshakeCodes response = HandshakeCodes.fromString((String) fromModel.readObject());
+		System.out.println("received " + (response == null ? null : response.toString()) + " from model");
 		
-		if(response instanceof HandshakeCodes) {
-			return finalizeHandshakeWithView(viewSocket, toView, (HandshakeCodes) response);
+		if(response != null) {
+			return finalizeHandshakeWithView(toView, response);
 		}
 		else {
 			throw new IOException(ERROR);
 		}
 	}
 
-	private static Socket finalizeHandshakeWithView(Socket viewSocket, ObjectOutputStream toView, HandshakeCodes response) throws IOException {
+	private static Boolean finalizeHandshakeWithView(ObjectOutputStream toView, HandshakeCodes response) throws IOException {
 		if(HandshakeCodes.MHMV.equals(response)) {
-			toView.writeObject(HandshakeCodes.CHMV);
+			toView.writeObject(HandshakeCodes.CHMV.toString());
 			toView.flush();
+			System.out.println("sent CHMV to view");
 			
-			return viewSocket;
+			return true;
 		}
 		else {
 			throw new IllegalArgumentException(ERROR);

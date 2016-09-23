@@ -5,8 +5,8 @@ import java.io.ObjectInputStream;
 import java.net.Socket;
 import java.util.Queue;
 
-import uk.ac.rhul.cs.dice.vacuumworld.controller.ViewRequest;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
+import uk.ac.rhul.cs.dice.vacuumworld.view.ViewRequest;
 
 public class ViewIncomingManagerRunnable implements Runnable {
 	private Queue<ViewRequest> viewRequests;
@@ -14,9 +14,9 @@ public class ViewIncomingManagerRunnable implements Runnable {
 	private ObjectInputStream fromView;
 	private boolean allRight;
 	
-	public ViewIncomingManagerRunnable(Socket socketWithView, Queue<ViewRequest> viewRequests) throws IOException {
+	public ViewIncomingManagerRunnable(Socket socketWithView, ObjectInputStream fromView, Queue<ViewRequest> viewRequests) throws IOException {
 		this.socketWithView = socketWithView;
-		this.fromView = new ObjectInputStream(this.socketWithView.getInputStream());
+		this.fromView = fromView;
 		this.viewRequests = viewRequests;
 		this.allRight = true;
 	}
