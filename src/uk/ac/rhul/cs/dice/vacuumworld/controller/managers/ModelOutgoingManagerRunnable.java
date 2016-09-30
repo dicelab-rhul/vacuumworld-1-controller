@@ -32,10 +32,13 @@ public class ModelOutgoingManagerRunnable implements Runnable {
 
 	private void forwardViewRequest() {
 		try {
+			System.out.println("Before polling view request for model");
 			ViewRequest request = this.viewRequests.poll();
 			// maybe here the controller can inspect and pre-process the request (in the future / should the need arise).
+			System.out.println("Before sending view request to model");
 			this.toModel.writeObject(request);
 			this.toModel.flush();
+			System.out.println("After sending view request to model");
 		}
 		catch(IOException e) {
 			this.allRight = false;

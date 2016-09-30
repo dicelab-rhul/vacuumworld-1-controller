@@ -32,18 +32,23 @@ public class ViewOutoingManagerRunnable implements Runnable {
 
 	private void forwardModelUpdate() {
 		try {
+			System.out.println("Before polling model update for view");
 			ModelUpdate update = this.modelUpdates.poll();
 			// maybe here the controller can inspect and pre-process the update (in the future / should the need arise).
+			System.out.println("Before sending model update to view");
 			this.toView.writeObject(update);
 			this.toView.flush();
+			System.out.println("After sending model update to view");
 		}
 		catch(IOException e) {
 			this.allRight = false;
 			Utils.log(e);
+			Utils.log(Utils.LOGS_PATH + "session.txt", "could not forward model update to view.");
 			closeSocketWithView();
 		}
 		catch(Exception e) {
 			Utils.log(e);
+			Utils.log(Utils.LOGS_PATH + "session.txt", "could not forward model update to view for unknown reasons.");
 		}
 	}
 

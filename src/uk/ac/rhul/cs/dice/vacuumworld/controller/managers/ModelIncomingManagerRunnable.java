@@ -35,14 +35,17 @@ public class ModelIncomingManagerRunnable implements Runnable {
 			if(update instanceof ModelUpdate) {
 				// maybe here the controller can inspect and pre-process the update (in the future / should the need arise).
 				this.modelUpdates.add((ModelUpdate) update);
+				Utils.log(Utils.LOGS_PATH + "session.txt", "added model update to queue.");
 			}
 		}
 		catch(ClassNotFoundException e) {
 			Utils.log(e);
+			Utils.log(Utils.LOGS_PATH + "session.txt", "could not decode class of model update.");
 		}
 		catch(IOException e) {
 			this.allRight = false;
 			Utils.log(e);
+			Utils.log(Utils.LOGS_PATH + "session.txt", "generic exception in reading model update.");
 			closeSocketWithModel();
 		}
 	}

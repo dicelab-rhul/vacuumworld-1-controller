@@ -91,6 +91,7 @@ public class ControllerServer {
 				checkDeadThread(alive);
 			}
 			catch(DeadThreadException e) {
+				Utils.log(Utils.LOGS_PATH + "session.txt", "Dead thread.");
 				return;
 			}
 		}

@@ -8,6 +8,8 @@ public class Main {
 	private Main(){}
 	
 	public static void main(String[] args) {
+		Utils.freshLog(Utils.LOGS_PATH + "session.txt", "");
+		
 		if(args.length < 2) {
 			Utils.log("Expected 2 arguments, " + args.length + " given.");
 			Utils.log("Usage: java -jar <this_file> <model_address> <model_port>");
