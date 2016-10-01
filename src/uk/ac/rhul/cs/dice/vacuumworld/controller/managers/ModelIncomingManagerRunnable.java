@@ -37,6 +37,9 @@ public class ModelIncomingManagerRunnable implements Runnable {
 				this.modelUpdates.add((ModelUpdate) update);
 				Utils.log(Utils.LOGS_PATH + "session.txt", "added model update to queue.");
 			}
+			else if(update instanceof String) {
+				manageStringFromModel((String) update);
+			}
 		}
 		catch(ClassNotFoundException e) {
 			Utils.log(e);
@@ -47,6 +50,12 @@ public class ModelIncomingManagerRunnable implements Runnable {
 			Utils.log(e);
 			Utils.log(Utils.LOGS_PATH + "session.txt", "generic exception in reading model update.");
 			closeSocketWithModel();
+		}
+	}
+
+	private void manageStringFromModel(String update) {
+		if("STOP".equals(update)) {
+			System.exit(0);
 		}
 	}
 
