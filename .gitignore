@@ -2,6 +2,10 @@ bin/
 bin/*
 bin/**
 
+logs/
+logs/*
+logs/**
+
 .directory
 *.jar
 *.class
