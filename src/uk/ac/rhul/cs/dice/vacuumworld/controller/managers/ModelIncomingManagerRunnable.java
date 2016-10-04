@@ -6,7 +6,8 @@ import java.net.Socket;
 import java.util.Queue;
 
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
-import uk.ac.rhul.cs.dice.vacuumworld.view.ModelUpdate;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelMessagesEnum;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelUpdate;
 
 public class ModelIncomingManagerRunnable implements Runnable {
 	private Queue<ModelUpdate> modelUpdates;
@@ -30,15 +31,15 @@ public class ModelIncomingManagerRunnable implements Runnable {
 	
 	private void getAndStoreModelUpdate() {
 		try {
-			Object update = this.fromModel.readObject();
+			ModelUpdate update = (ModelUpdate) this.fromModel.readObject();
 			
-			if(update instanceof ModelUpdate) {
+			if(!checkForTerminationSignal(update)) {
 				// maybe here the controller can inspect and pre-process the update (in the future / should the need arise).
 				this.modelUpdates.add((ModelUpdate) update);
 				Utils.log(Utils.LOGS_PATH + "session.txt", "added model update to queue.");
 			}
-			else if(update instanceof String) {
-				manageStringFromModel((String) update);
+			else {
+				manageStopSignalFromModel(update);
 			}
 		}
 		catch(ClassNotFoundException e) {
@@ -53,9 +54,20 @@ public class ModelIncomingManagerRunnable implements Runnable {
 		}
 	}
 
-	private void manageStringFromModel(String update) {
-		if("STOP".equals(update)) {
+	private boolean checkForTerminationSignal(ModelUpdate update) {
+		return ModelMessagesEnum.STOP_CONTROLLER.equals(update.getCode()) || ModelMessagesEnum.STOP_FORWARD.equals(update.getCode());
+	}
+
+	private void manageStopSignalFromModel(ModelUpdate update) {
+		switch(update.getCode()) {
+		case STOP_FORWARD:
+			this.modelUpdates.add(update);
+			//and fall through
+		case STOP_CONTROLLER :
 			System.exit(0);
+			break;
+		default:
+			return;
 		}
 	}
 

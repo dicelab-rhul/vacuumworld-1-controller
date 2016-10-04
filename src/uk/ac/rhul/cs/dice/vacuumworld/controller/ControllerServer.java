@@ -15,8 +15,8 @@ import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeCodes;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeException;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.DeadThreadException;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
-import uk.ac.rhul.cs.dice.vacuumworld.view.ModelUpdate;
-import uk.ac.rhul.cs.dice.vacuumworld.view.ViewRequest;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelUpdate;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ViewRequest;
 
 public class ControllerServer {
 	private static ControllerServer instance;

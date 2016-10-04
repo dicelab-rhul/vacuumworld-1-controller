@@ -6,7 +6,7 @@ import java.net.Socket;
 import java.util.Queue;
 
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
-import uk.ac.rhul.cs.dice.vacuumworld.view.ViewRequest;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ViewRequest;
 
 public class ViewIncomingManagerRunnable implements Runnable {
 	private Queue<ViewRequest> viewRequests;

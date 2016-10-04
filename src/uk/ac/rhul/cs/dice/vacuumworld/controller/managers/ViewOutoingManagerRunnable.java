@@ -6,7 +6,7 @@ import java.net.Socket;
 import java.util.Queue;
 
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
-import uk.ac.rhul.cs.dice.vacuumworld.view.ModelUpdate;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelUpdate;
 
 public class ViewOutoingManagerRunnable implements Runnable {
 	private Queue<ModelUpdate> modelUpdates;
