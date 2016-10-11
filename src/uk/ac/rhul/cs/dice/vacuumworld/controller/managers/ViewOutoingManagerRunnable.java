@@ -5,16 +5,19 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.Queue;
 
+import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.StopSignal;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelUpdate;
 
 public class ViewOutoingManagerRunnable implements Runnable {
+	private volatile StopSignal sharedStopSignal;
 	private Queue<ModelUpdate> modelUpdates;
 	private Socket socketWithView;
 	private ObjectOutputStream toView;
 	private boolean allRight;
 	
-	public ViewOutoingManagerRunnable(Socket socketWithView, ObjectOutputStream toView, Queue<ModelUpdate> modelUpdates) throws IOException {
+	public ViewOutoingManagerRunnable(StopSignal sharedStopSignal, Socket socketWithView, ObjectOutputStream toView, Queue<ModelUpdate> modelUpdates) throws IOException {
+		this.sharedStopSignal = sharedStopSignal;
 		this.socketWithView = socketWithView;
 		this.toView = toView;
 		this.modelUpdates = modelUpdates;
@@ -24,6 +27,12 @@ public class ViewOutoingManagerRunnable implements Runnable {
 	@Override
 	public void run() {
 		while(this.allRight) {
+			if(this.sharedStopSignal.mustStop()) {
+				Utils.logWithClass(this.getClass().getSimpleName(), "Shared stop signal is true: quitting...");
+				
+				return;
+			}
+			
 			if(!this.modelUpdates.isEmpty()) {
 				forwardModelUpdate();
 			}
@@ -32,23 +41,26 @@ public class ViewOutoingManagerRunnable implements Runnable {
 
 	private void forwardModelUpdate() {
 		try {
-			System.out.println("Before polling model update for view");
-			ModelUpdate update = this.modelUpdates.poll();
+			Utils.logWithClass(this.getClass().getSimpleName(), "Before polling model update for view...");
+			ModelUpdate update = safePoll();
+			
+			if(update == null || this.sharedStopSignal.mustStop()) {
+				return;
+			}
+			
+			Utils.logWithClass(this.getClass().getSimpleName(), "After polling model update for view.");
+			
 			// maybe here the controller can inspect and pre-process the update (in the future / should the need arise).
-			System.out.println("Before sending model update to view");
+			
+			Utils.logWithClass(this.getClass().getSimpleName(), "Before sending model update to view...");
 			this.toView.writeObject(update);
 			this.toView.flush();
-			System.out.println("After sending model update to view");
-		}
-		catch(IOException e) {
-			this.allRight = false;
-			Utils.log(e);
-			Utils.log(Utils.LOGS_PATH + "session.txt", "could not forward model update to view.");
-			closeSocketWithView();
+			Utils.logWithClass(this.getClass().getSimpleName(), "After sending model update to view.\n");
 		}
 		catch(Exception e) {
+			this.allRight = false;
 			Utils.log(e);
-			Utils.log(Utils.LOGS_PATH + "session.txt", "could not forward model update to view for unknown reasons.");
+			closeSocketWithView();
 		}
 	}
 
@@ -59,5 +71,15 @@ public class ViewOutoingManagerRunnable implements Runnable {
 		catch (IOException e) {
 			Utils.log(e);
 		}
+	}
+	
+	private ModelUpdate safePoll() {
+		while(!this.sharedStopSignal.mustStop()) {
+			if(!this.modelUpdates.isEmpty()) {
+				return this.modelUpdates.poll();
+			}
+		}
+		
+		return null;
 	}
 }

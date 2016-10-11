@@ -5,17 +5,20 @@ import java.io.ObjectInputStream;
 import java.net.Socket;
 import java.util.Queue;
 
+import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.StopSignal;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelMessagesEnum;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelUpdate;
 
 public class ModelIncomingManagerRunnable implements Runnable {
+	private volatile StopSignal sharedStopSignal;
 	private Queue<ModelUpdate> modelUpdates;
 	private Socket socketWithModel;
 	private ObjectInputStream fromModel;
 	private boolean allRight;
 	
-	public ModelIncomingManagerRunnable(Socket socketWithModel, ObjectInputStream fromModel, Queue<ModelUpdate> modelUpdates) throws IOException {
+	public ModelIncomingManagerRunnable(StopSignal sharedStopSignal, Socket socketWithModel, ObjectInputStream fromModel, Queue<ModelUpdate> modelUpdates) throws IOException {
+		this.sharedStopSignal = sharedStopSignal;
 		this.socketWithModel = socketWithModel;
 		this.fromModel = fromModel;
 		this.modelUpdates = modelUpdates;
@@ -25,32 +28,40 @@ public class ModelIncomingManagerRunnable implements Runnable {
 	@Override
 	public void run() {
 		while(this.allRight) {
+			if(this.sharedStopSignal.mustStop()) {
+				Utils.logWithClass(this.getClass().getSimpleName(), "Shared stop signal is true: quitting...");
+				
+				return;
+			}
+			
 			getAndStoreModelUpdate();
 		}
 	}
 	
 	private void getAndStoreModelUpdate() {
 		try {
-			ModelUpdate update = (ModelUpdate) this.fromModel.readObject();
+			Utils.logWithClass(this.getClass().getSimpleName(), "Waiting for model update for view from model...");
+			Object update = safeRead();
 			
-			if(!checkForTerminationSignal(update)) {
+			if(update == null || this.sharedStopSignal.mustStop()) {
+				return;
+			}
+			
+			Utils.logWithClass(this.getClass().getSimpleName(), "Received model update for view from model.");
+			
+			if(!checkForTerminationSignal((ModelUpdate) update)) {
 				// maybe here the controller can inspect and pre-process the update (in the future / should the need arise).
+				
+				Utils.logWithClass(this.getClass().getSimpleName(), "Adding model update for view to the queue...");
 				this.modelUpdates.add((ModelUpdate) update);
-				Utils.log(Utils.LOGS_PATH + "session.txt", "added model update to queue.");
+				Utils.logWithClass(this.getClass().getSimpleName(), "Added model update for view to the queue.");
 			}
 			else {
-				manageStopSignalFromModel(update);
+				manageStopSignalFromModel((ModelUpdate) update);
 			}
 		}
-		catch(ClassNotFoundException e) {
-			Utils.log(e);
-			Utils.log(Utils.LOGS_PATH + "session.txt", "could not decode class of model update.");
-		}
-		catch(IOException e) {
-			this.allRight = false;
-			Utils.log(e);
-			Utils.log(Utils.LOGS_PATH + "session.txt", "generic exception in reading model update.");
-			closeSocketWithModel();
+		catch(Exception e) {
+			manageException(e);
 		}
 	}
 
@@ -59,15 +70,17 @@ public class ModelIncomingManagerRunnable implements Runnable {
 	}
 
 	private void manageStopSignalFromModel(ModelUpdate update) {
+		Utils.logWithClass(this.getClass().getSimpleName(), "Received stop signal from model.");
+		
 		switch(update.getCode()) {
 		case STOP_FORWARD:
 			this.modelUpdates.add(update);
-			//and fall through
-		case STOP_CONTROLLER :
-			System.exit(0);
+			this.sharedStopSignal.stop();
 			break;
+		case STOP_CONTROLLER :
 		default:
-			return;
+			this.sharedStopSignal.stop();
+			break;
 		}
 	}
 
@@ -76,7 +89,22 @@ public class ModelIncomingManagerRunnable implements Runnable {
 			this.socketWithModel.close();
 		}
 		catch (IOException e) {
+			Utils.fakeLog(e);
+		}
+	}
+	
+	private Object safeRead() throws ClassNotFoundException, IOException {
+		return this.fromModel.readObject();
+	}
+	
+	private void manageException(Exception e) {
+		if(this.sharedStopSignal.mustStop()) {
+			return;
+		}
+		else {
+			this.allRight = false;
 			Utils.log(e);
+			closeSocketWithModel();
 		}
 	}
 }

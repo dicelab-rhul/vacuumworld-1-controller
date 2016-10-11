@@ -1,35 +1,40 @@
 package uk.ac.rhul.cs.dice.vacuumworld.controller;
 
-import java.io.IOException;
-
+import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.ConfigData;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
 
 public class Main {
 	private Main(){}
 	
-	public static void main(String[] args) {
-		Utils.freshLog(Utils.LOGS_PATH + "session.txt", "");
-		
+	public static void main(String[] args) {		
 		if(args.length < 2) {
-			Utils.log("Expected 2 arguments, " + args.length + " given.");
-			Utils.log("Usage: java -jar <this_file> <model_address> <model_port>");
-			System.exit(-1);
+			Utils.logWithClass(Main.class.getSimpleName(), "Usage: java -jar <this_file> --config-file <config-json-file-path>");
 		}
-		
-		String modelIp = args[0];
-		int modelPort = Integer.parseInt(args[1]);
-		
-		try {
-			startControllerServer(modelIp, modelPort);
-		}
-		catch(Exception e) {
-			Utils.log(e);
-			System.exit(-1);
+		else {
+			String configFilePath = retrieveConfigFilePath(args);
+			ConfigData.initConfigData(configFilePath);
+			startController();
+			System.exit(0);
 		}
 	}
 
-	private static void startControllerServer(String modelIp, int modelPort) throws IOException {
-		ControllerServer.getInstance(modelIp, modelPort);
-		ControllerServer.startControllerServer();
+	private static String retrieveConfigFilePath(String[] args) {
+		if("--config-file".equals(args[0])) {
+			return args[1];
+		}
+		else {
+			return null;
+		}
+	}
+
+	private static void startController() {		
+		try {
+			ControllerServer.getInstance();
+			ControllerServer.startControllerServer();
+			Utils.logWithClass(ControllerServer.class.getSimpleName(), "Bye!!!");
+		}
+		catch(Exception e) {
+			Utils.log(e);
+		}
 	}
 }

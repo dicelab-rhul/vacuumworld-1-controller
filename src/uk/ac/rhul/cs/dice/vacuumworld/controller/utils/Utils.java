@@ -2,18 +2,27 @@ package uk.ac.rhul.cs.dice.vacuumworld.controller.utils;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.VacuumWorldLogFormatter;
+
 public class Utils {
-	public static final String MODEL_IP = "127.0.0.1";
-	public static final int MODEL_PORT = 10890;
-	public static final String CONTROLLER_IP = "127.0.0.1";
-	public static final int CONTROLLER_PORT = 1890;
-	private static final Logger LOGGER = Logger.getGlobal();
-	public static final String LOGS_PATH = "/home/cloudstrife9999/workspace/VacuumWorldController/logs/";
+	private static final Logger LOGGER = initLogger();
 	
 	private Utils(){}
+	
+	private static Logger initLogger() {
+		Logger logger = Logger.getAnonymousLogger();
+		logger.setUseParentHandlers(false);
+		VacuumWorldLogFormatter formatter = new VacuumWorldLogFormatter();
+		ConsoleHandler handler = new ConsoleHandler();
+		handler.setFormatter(formatter);
+		logger.addHandler(handler);
+		
+		return logger;
+	}
 	
 	public static void log(String message) {
 		log(Level.INFO, message);
@@ -21,6 +30,10 @@ public class Utils {
 	
 	public static void log(Exception e) {
 		log(e.getMessage(), e);
+	}
+	
+	public static void fakeLog(Exception e) {
+		//this exception does not need to be logged
 	}
 
 	public static void log(String message, Exception e) {
@@ -35,22 +48,24 @@ public class Utils {
 		LOGGER.log(level, message, e);
 	}
 	
-	public static void freshLog(String filename, String... toLog) {
+	public static void logWithClass(String source, String message) {
+		log(source + ": " + message);
+	}
+	
+	public static void logOnFileAndOverwrite(String filename, String... toLog) {
 		log(filename, false, toLog);
 	}
 	
-	public static void log(String filename, String... toLog) {
+	public static void logOnFileAndAppend(String filename, String... toLog) {
 		log(filename, true, toLog);
 	}
 	
 	public static void log(String filename, boolean append, String... toLog) {
-		try {
-			FileOutputStream fo = new FileOutputStream(filename, append);
+		try(FileOutputStream fo = new FileOutputStream(filename, append)) {
 			log(fo, toLog);
-			fo.close();
 		}
-		catch(IOException e) {
-			e.printStackTrace(System.err);
+		catch(Exception e) {
+			log(e);
 		}
 		
 	}

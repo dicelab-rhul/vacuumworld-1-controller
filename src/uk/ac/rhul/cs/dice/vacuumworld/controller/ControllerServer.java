@@ -6,6 +6,10 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import uk.ac.rhul.cs.dice.vacuumworld.controller.managers.ModelIncomingManagerRunnable;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.managers.ModelOutgoingManagerRunnable;
@@ -13,179 +17,205 @@ import uk.ac.rhul.cs.dice.vacuumworld.controller.managers.ViewIncomingManagerRun
 import uk.ac.rhul.cs.dice.vacuumworld.controller.managers.ViewOutoingManagerRunnable;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeCodes;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeException;
-import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.DeadThreadException;
+import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.StopSignal;
+import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.ConfigData;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelUpdate;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ViewRequest;
 
 public class ControllerServer {
 	private static ControllerServer instance;
-	private static String modelIp;
-	private static int modelPort;
+	private static ServerSocket server;
+	
 	private static ConcurrentLinkedQueue<ViewRequest> viewRequests;
 	private static ConcurrentLinkedQueue<ModelUpdate> modelUpdates;
+	
 	private static Socket socketWithView;
 	private static ObjectOutputStream toViewStream;
 	private static ObjectInputStream fromViewStream;
+	
 	private static Socket socketWithModel;
 	private static ObjectOutputStream toModelStream;
 	private static ObjectInputStream fromModelStream;
-	private static ServerSocket server;
-	private static boolean started;
+	
+	private static volatile StopSignal sharedStopSignal;
+	private static ExecutorService executor;
 	
 	private static ViewIncomingManagerRunnable fromView;
 	private static ViewOutoingManagerRunnable toView;
 	private static ModelIncomingManagerRunnable fromModel;
 	private static ModelOutgoingManagerRunnable toModel;
 	
-	private static Thread fromViewThread;
-	private static Thread toViewThread;
-	private static Thread fromModelThread;
-	private static Thread toModelThread;
-	
-	private ControllerServer(String modelIp, int modelPort) {
-		ControllerServer.modelIp = modelIp;
-		ControllerServer.modelPort = modelPort;
+	private ControllerServer() {
 		ControllerServer.viewRequests = new ConcurrentLinkedQueue<>();
 		ControllerServer.modelUpdates = new ConcurrentLinkedQueue<>();
+		ControllerServer.sharedStopSignal = new StopSignal();
 	}
 	
-	public static ControllerServer getInstance(String modelIp, int modelPort) {
-		if(instance == null) {
-			instance = new ControllerServer(modelIp, modelPort);
+	public static ControllerServer getInstance() {
+		if(ControllerServer.instance == null) {
+			ControllerServer.instance = new ControllerServer();
 		}
 		
-		return instance;
+		return ControllerServer.instance;
 	}
 	
 	public static void startControllerServer() throws IOException {
-		server = new ServerSocket(Utils.CONTROLLER_PORT);
-		started = true;
+		Utils.logWithClass(ControllerServer.class.getSimpleName(), "Starting controller server...");
 		
-		while(started) {
-			connectWithModelIfNecessary();
-			waitForViewConnectionIfNecessary();
-			startManagers();
-			monitorManagers();
-			stopThreads();
+		ControllerServer.server = new ServerSocket(ConfigData.getControllerPort());
+		
+		connectWithModelIfNecessary();
+		waitForViewConnectionIfNecessary();
+		startManagers();
+		
+		startMonitoringLoop();
+		
+		ControllerServer.server.close();
+	}
+
+	private static void startMonitoringLoop() throws IOException {
+		while(((ThreadPoolExecutor) ControllerServer.executor).getActiveCount() == 4) {
+			continue;
+		}
+		
+		if(ControllerServer.sharedStopSignal.mustStop()) {
+			waitAndAct();
+		}
+		else {
+			killLeftovers("One or more threads died. Killing leftovers...");
 		}
 	}
 
-	private static void stopThreads() {
-		fromViewThread.interrupt();
-		toViewThread.interrupt();
-		fromModelThread.interrupt();
-		toModelThread.interrupt();
+	private static void waitAndAct() {
+		while(((ThreadPoolExecutor) ControllerServer.executor).getActiveCount() != 1) {
+			continue;
+		}
+		
+		killLeftovers(ViewIncomingManagerRunnable.class.getSimpleName() + " left to kill. Proceeding...");
 	}
 
-	private static void monitorManagers() {
-		while(true) {
-			try {
-				boolean alive = fromViewThread.isAlive();
-				checkDeadThread(alive);
-				alive = toViewThread.isAlive();
-				checkDeadThread(alive);
-				alive = fromModelThread.isAlive();
-				checkDeadThread(alive);
-				alive = toModelThread.isAlive();
-				checkDeadThread(alive);
-			}
-			catch(DeadThreadException e) {
-				Utils.log(Utils.LOGS_PATH + "session.txt", "Dead thread.");
-				return;
-			}
+	private static void killLeftovers(String message) {
+		try {
+			Utils.logWithClass(ControllerServer.class.getSimpleName(), message);
+			
+			ControllerServer.fromModelStream.close();
+			ControllerServer.toModelStream.close();
+			ControllerServer.fromViewStream.close();
+			ControllerServer.toViewStream.close();
+			ControllerServer.socketWithView.close();
+			ControllerServer.socketWithModel.close();
+			
+			ControllerServer.executor.shutdownNow();
+			ControllerServer.executor.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
+			Utils.logWithClass(ControllerServer.class.getSimpleName(), "Done.");
 		}
-	}
-	
-	private static void checkDeadThread(boolean alive) throws DeadThreadException {
-		if(!alive) {
-			throw new DeadThreadException();
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		catch (IOException e) {
+			Utils.log(e);
 		}
 	}
 
 	private static void startManagers() throws IOException {
-		fromView = new ViewIncomingManagerRunnable(socketWithView, fromViewStream, viewRequests);
-		toView = new ViewOutoingManagerRunnable(socketWithView, toViewStream, modelUpdates);
-		fromModel = new ModelIncomingManagerRunnable(socketWithModel, fromModelStream, modelUpdates);
-		toModel = new ModelOutgoingManagerRunnable(socketWithModel, toModelStream, viewRequests);
-		
-		createAndStartThreads();
-	}
-
-	private static void createAndStartThreads() {
-		fromViewThread = new Thread(fromView);
-		toViewThread = new Thread(toView);
-		fromModelThread = new Thread(fromModel);
-		toModelThread = new Thread(toModel);
+		ControllerServer.fromView = new ViewIncomingManagerRunnable(ControllerServer.sharedStopSignal, ControllerServer.socketWithView, ControllerServer.fromViewStream, ControllerServer.viewRequests);
+		ControllerServer.toView = new ViewOutoingManagerRunnable(ControllerServer.sharedStopSignal, ControllerServer.socketWithView, ControllerServer.toViewStream, ControllerServer.modelUpdates);
+		ControllerServer.fromModel = new ModelIncomingManagerRunnable(ControllerServer.sharedStopSignal, ControllerServer.socketWithModel, ControllerServer.fromModelStream, ControllerServer.modelUpdates);
+		ControllerServer.toModel = new ModelOutgoingManagerRunnable(ControllerServer.sharedStopSignal, ControllerServer.socketWithModel, ControllerServer.toModelStream, ControllerServer.viewRequests);
 		
 		startThreads();
 	}
 
 	private static void startThreads() {
-		toViewThread.start();
-		toModelThread.start();
-		fromModelThread.start();
-		fromViewThread.start();
+		ControllerServer.executor = Executors.newFixedThreadPool(4);
+		
+		ControllerServer.executor.execute(ControllerServer.fromModel);
+		ControllerServer.executor.execute(ControllerServer.toModel);
+		ControllerServer.executor.execute(ControllerServer.fromView);
+		ControllerServer.executor.execute(ControllerServer.toView);
 	}
 
 	private static void waitForViewConnectionIfNecessary() {
 		try {
-			if(socketWithView == null) {
+			if(ControllerServer.socketWithView == null) {
 				waitForViewConnection();
 				
+				return;
 			}
-			else if(socketWithView.isClosed()) {
+			
+			if(ControllerServer.socketWithView.isClosed()) {
 				waitForViewConnection();
+				
+				return;
 			}
 		}
 		catch(Exception e) {
-			return;
+			Utils.log(e);
 		}
 	}
 
 	private static void waitForViewConnection() throws IOException, ClassNotFoundException, HandshakeException {
-		System.out.println("Waiting for view...");
-		Socket socket = server.accept();
+		Utils.logWithClass(ControllerServer.class.getSimpleName(), "Waiting for view...");
+
+		Socket socket = ControllerServer.server.accept();
 		ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
 		ObjectInputStream input = new ObjectInputStream(socket.getInputStream());
 		
 		HandshakeCodes code = HandshakeCodes.fromString((String) input.readObject());
-		System.out.println("received " + (code == null ? null : code.toString()) + " from view");
 		
+		Utils.logWithClass(ControllerServer.class.getSimpleName(), "Received " + (code == null ? null : code.toString()) + " from view.");
+		
+		attemptHandshakeWithView(code, socket, input, output);
+	}
+
+	private static void attemptHandshakeWithView(HandshakeCodes code, Socket socket, ObjectInputStream input, ObjectOutputStream output) throws HandshakeException {
 		if(code == null) {
 			throw new IllegalArgumentException("Bad handshake.");
 		}
 		
-		if(Handshake.attemptHandshakeWithView(toModelStream, fromModelStream, output, code)) {
-			socketWithView = socket;
-			toViewStream = output;
-			fromViewStream = input;
+		if(Handshake.attemptHandshakeWithView(ControllerServer.toModelStream, ControllerServer.fromModelStream, output, code)) {
+			ControllerServer.socketWithView = socket;
+			ControllerServer.toViewStream = output;
+			ControllerServer.fromViewStream = input;
 		}
 	}
 
 	private static void connectWithModelIfNecessary() {
 		try {
-			if(socketWithModel == null) {
-				tryHandshake();
+			if(ControllerServer.socketWithModel == null) {
+				tryHandshakeWithModel();
+				
+				return;
 			}
-			else if(socketWithModel.isClosed()) {
-				tryHandshake();
+			
+			if(ControllerServer.socketWithModel.isClosed()) {
+				tryHandshakeWithModel();
+				
+				return;
 			}
 		}
 		catch(Exception e) {
-			return;
+			Utils.log(e);
 		}
 	}
 
-	private static void tryHandshake() throws IOException, HandshakeException {
-		Socket socket = new Socket(modelIp, modelPort);
+	private static void tryHandshakeWithModel() throws IOException, HandshakeException {
+		Socket socket = new Socket(ConfigData.getModelIp(), ConfigData.getModelPort());
 		ObjectOutputStream o = new ObjectOutputStream(socket.getOutputStream());
 		ObjectInputStream i = new ObjectInputStream(socket.getInputStream());
 		
+		checkHandshakeWithModelResult(socket, i, o);
+	}
+
+	private static void checkHandshakeWithModelResult(Socket socket, ObjectInputStream i, ObjectOutputStream o) throws HandshakeException, IOException {
 		if(Handshake.attemptHandshakeWithModel(o, i)) {
-			socketWithModel = socket;
-			toModelStream = o;
-			fromModelStream = i;
+			ControllerServer.socketWithModel = socket;
+			ControllerServer.toModelStream = o;
+			ControllerServer.fromModelStream = i;
+		}
+		else {
+			socket.close();
 		}
 	}
 }

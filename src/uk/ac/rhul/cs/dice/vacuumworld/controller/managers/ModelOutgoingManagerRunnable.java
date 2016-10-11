@@ -5,16 +5,19 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.Queue;
 
+import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.StopSignal;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ViewRequest;
 
 public class ModelOutgoingManagerRunnable implements Runnable {
+	private volatile StopSignal sharedStopSignal;
 	private Queue<ViewRequest> viewRequests;
 	private Socket socketWithModel;
 	private ObjectOutputStream toModel;
 	private boolean allRight;
 	
-	public ModelOutgoingManagerRunnable(Socket socketWithModel, ObjectOutputStream toModel, Queue<ViewRequest> viewRequests) throws IOException {
+	public ModelOutgoingManagerRunnable(StopSignal sharedStopSignal, Socket socketWithModel, ObjectOutputStream toModel, Queue<ViewRequest> viewRequests) throws IOException {
+		this.sharedStopSignal = sharedStopSignal;
 		this.socketWithModel = socketWithModel;
 		this.toModel = toModel;
 		this.viewRequests = viewRequests;
@@ -24,6 +27,12 @@ public class ModelOutgoingManagerRunnable implements Runnable {
 	@Override
 	public void run() {
 		while(this.allRight) {
+			if(this.sharedStopSignal.mustStop()) {
+				Utils.logWithClass(this.getClass().getSimpleName(), "Shared stop signal is true: quitting...");
+				
+				return;
+			}
+			
 			if(!this.viewRequests.isEmpty()) {
 				forwardViewRequest();
 			}
@@ -32,21 +41,26 @@ public class ModelOutgoingManagerRunnable implements Runnable {
 
 	private void forwardViewRequest() {
 		try {
-			System.out.println("Before polling view request for model");
-			ViewRequest request = this.viewRequests.poll();
+			Utils.logWithClass(this.getClass().getSimpleName(), "Before polling view request for model...");
+			ViewRequest request = safePoll();
+			
+			if(request == null || this.sharedStopSignal.mustStop()) {
+				return;
+			}
+			
+			Utils.logWithClass(this.getClass().getSimpleName(), "After polling view request for model.");
+			
 			// maybe here the controller can inspect and pre-process the request (in the future / should the need arise).
-			System.out.println("Before sending view request to model");
+			
+			Utils.logWithClass(this.getClass().getSimpleName(), "Before sending view request to model...");
 			this.toModel.writeObject(request);
 			this.toModel.flush();
-			System.out.println("After sending view request to model");
+			Utils.logWithClass(this.getClass().getSimpleName(), "After sending view request to model.");
 		}
-		catch(IOException e) {
+		catch(Exception e) {
 			this.allRight = false;
 			Utils.log(e);
 			closeSocketWithModel();
-		}
-		catch(Exception e) {
-			Utils.log(e);
 		}
 	}
 
@@ -57,5 +71,15 @@ public class ModelOutgoingManagerRunnable implements Runnable {
 		catch (IOException e) {
 			Utils.log(e);
 		}
+	}
+	
+	private ViewRequest safePoll() {
+		while(!this.sharedStopSignal.mustStop()) {
+			if(!this.viewRequests.isEmpty()) {
+				return this.viewRequests.poll();
+			}
+		}
+		
+		return null;
 	}
 }

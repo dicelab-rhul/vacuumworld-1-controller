@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeCodes;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeException;
+import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
 
 public class Handshake {
 	private static final String ERROR = "Bad handshake.";
@@ -25,25 +26,19 @@ public class Handshake {
 			return future.get(TIME_TO_WAIT, TimeUnit.MILLISECONDS);
 		}
 		catch (Exception e) {
-			e.printStackTrace();
 			throw new HandshakeException(e);
 		}
 	}
 	
-	/*private static Boolean doHandshakeWithModel(ObjectOutputStream toModel, ObjectInputStream fromModel) throws IOException, ClassNotFoundException {
-		ObjectOutputStream toModel = new ObjectOutputStream(modelSocket.getOutputStream());
-		ObjectInputStream fromModel = new ObjectInputStream(modelSocket.getInputStream());
-		
-		return doHandshakeWithModel(modelSocket, toModel, fromModel);
-	}*/
-	
 	private static Boolean doHandshakeWithModel(ObjectOutputStream toModel, ObjectInputStream fromModel) throws IOException, ClassNotFoundException {
 		toModel.writeObject(HandshakeCodes.CHCM.toString());
 		toModel.flush();
-		System.out.println("sent CHCM to model");
+		
+		Utils.logWithClass(Handshake.class.getSimpleName(), "Sent CHCM to model.");
 		
 		HandshakeCodes response = HandshakeCodes.fromString((String) fromModel.readObject());
-		System.out.println("received " + (response == null ? null : response.toString()) + " from model"); //MHMC
+		
+		Utils.logWithClass(Handshake.class.getSimpleName(), "Received " + (response == null ? null : response.toString()) + " from model."); //MHMC
 		
 		if(response != null) {
 			return finalizeHandshakeWithModel(response);
@@ -73,28 +68,6 @@ public class Handshake {
 			throw new HandshakeException(e);
 		}
 	}
-	
-	/*private static Socket doHandshakeWithView(Socket viewSocket, Socket mSocket, HandshakeCodes codeFromView, String modelIp, int modelPort) throws IOException, ClassNotFoundException {
-		Socket modelSocket = getModelSocket(mSocket, modelIp, modelPort);
-		
-		ObjectOutputStream toView = new ObjectOutputStream(viewSocket.getOutputStream());
-		ObjectOutputStream toModel = new ObjectOutputStream(modelSocket.getOutputStream());
-		ObjectInputStream fromModel = new ObjectInputStream(modelSocket.getInputStream());
-		
-		return doHandshakeWithView(viewSocket, codeFromView, toView, toModel, fromModel);
-	}
-
-	private static Socket getModelSocket(Socket mSocket, String modelIp, int modelPort) throws IOException, ClassNotFoundException {
-		if(mSocket == null) {
-			return doHandshakeWithModel(modelIp, modelPort);
-		}
-		else if(mSocket.isClosed() || !mSocket.isConnected()) {
-			return doHandshakeWithModel(modelIp, modelPort);
-		}
-		else {
-			return mSocket;
-		}
-	}*/
 
 	private static Boolean doHandshakeWithView(ObjectOutputStream toModel, ObjectInputStream fromModel, ObjectOutputStream toView, HandshakeCodes codeFromView) throws IOException, ClassNotFoundException {
 		if(HandshakeCodes.VHVC.equals(codeFromView)) {
@@ -108,18 +81,20 @@ public class Handshake {
 	private static Boolean doHandshakeWithView(ObjectOutputStream toView, ObjectOutputStream toModel, ObjectInputStream fromModel) throws IOException, ClassNotFoundException {
 		toView.writeObject(HandshakeCodes.CHCV.toString());
 		toView.flush();
-		System.out.println("sent CHCV to view");
+		
+		Utils.logWithClass(Handshake.class.getSimpleName(), "Sent CHCV to view.");
 		
 		toModel.writeObject(HandshakeCodes.CHVM.toString());
 		toModel.flush();
-		System.out.println("sent CHVM to model");
+		
+		Utils.logWithClass(Handshake.class.getSimpleName(), "Sent CHVM to model.");
 		
 		return doHandshakeWithView(toView, fromModel);
 	}
 
 	private static Boolean doHandshakeWithView(ObjectOutputStream toView, ObjectInputStream fromModel) throws ClassNotFoundException, IOException {
 		HandshakeCodes response = HandshakeCodes.fromString((String) fromModel.readObject());
-		System.out.println("received " + (response == null ? null : response.toString()) + " from model");
+		Utils.logWithClass(Handshake.class.getSimpleName(), "Received " + (response == null ? null : response.toString()) + " from model.");
 		
 		if(response != null) {
 			return finalizeHandshakeWithView(toView, response);
@@ -133,7 +108,8 @@ public class Handshake {
 		if(HandshakeCodes.MHMV.equals(response)) {
 			toView.writeObject(HandshakeCodes.CHMV.toString());
 			toView.flush();
-			System.out.println("sent CHMV to view");
+			
+			Utils.logWithClass(Handshake.class.getSimpleName(), "Sent CHMV to view.\n");
 			
 			return true;
 		}
