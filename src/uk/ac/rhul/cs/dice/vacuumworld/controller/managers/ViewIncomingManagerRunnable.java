@@ -5,8 +5,8 @@ import java.io.ObjectInputStream;
 import java.net.Socket;
 import java.util.Queue;
 
-import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.StopSignal;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.StopSignal;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ViewRequest;
 
 public class ViewIncomingManagerRunnable implements Runnable {

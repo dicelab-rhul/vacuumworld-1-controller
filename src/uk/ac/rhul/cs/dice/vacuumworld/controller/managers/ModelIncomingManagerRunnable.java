@@ -5,10 +5,10 @@ import java.io.ObjectInputStream;
 import java.net.Socket;
 import java.util.Queue;
 
-import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.StopSignal;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelMessagesEnum;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelUpdate;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.StopSignal;
 
 public class ModelIncomingManagerRunnable implements Runnable {
 	private volatile StopSignal sharedStopSignal;

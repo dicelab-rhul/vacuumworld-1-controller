@@ -17,10 +17,10 @@ import uk.ac.rhul.cs.dice.vacuumworld.controller.managers.ViewIncomingManagerRun
 import uk.ac.rhul.cs.dice.vacuumworld.controller.managers.ViewOutoingManagerRunnable;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeCodes;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeException;
-import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.StopSignal;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.ConfigData;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ModelUpdate;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.StopSignal;
 import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.ViewRequest;
 
 public class ControllerServer {
