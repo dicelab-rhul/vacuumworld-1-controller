@@ -8,13 +8,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeCodes;
-import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.HandshakeException;
+import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.ConfigData;
 import uk.ac.rhul.cs.dice.vacuumworld.controller.utils.Utils;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.HandshakeCodes;
+import uk.ac.rhul.cs.dice.vacuumworld.wvcommon.HandshakeException;
 
 public class Handshake {
 	private static final String ERROR = "Bad handshake.";
-	private static final int TIME_TO_WAIT = 100000;
 	
 	private Handshake(){}
 	
@@ -23,7 +23,7 @@ public class Handshake {
 		Future<Boolean> future = executor.submit(() -> doHandshakeWithModel(toModel, fromModel));
 		
 		try {
-			return future.get(TIME_TO_WAIT, TimeUnit.MILLISECONDS);
+			return future.get(ConfigData.getTimeoutInSeconds(), TimeUnit.SECONDS);
 		}
 		catch (Exception e) {
 			throw new HandshakeException(e);
@@ -44,7 +44,7 @@ public class Handshake {
 			return finalizeHandshakeWithModel(response);
 		}
 		else {
-			throw new IOException(ERROR);
+			throw new IOException(Handshake.ERROR);
 		}
 	}
 
@@ -53,7 +53,7 @@ public class Handshake {
 			return true;
 		}
 		else {
-			throw new IllegalArgumentException(ERROR);
+			throw new IllegalArgumentException(Handshake.ERROR);
 		}
 	}
 
@@ -62,7 +62,7 @@ public class Handshake {
 		Future<Boolean> future = executor.submit(() -> doHandshakeWithView(toModel, fromModel, toView, codeFromView));
 		
 		try {
-			return future.get(TIME_TO_WAIT, TimeUnit.MILLISECONDS);
+			return future.get(ConfigData.getTimeoutInSeconds(), TimeUnit.SECONDS);
 		}
 		catch (Exception e) {
 			throw new HandshakeException(e);
@@ -74,7 +74,7 @@ public class Handshake {
 			return doHandshakeWithView(toView, toModel, fromModel);
 		}
 		else {
-			throw new IllegalArgumentException(ERROR);
+			throw new IllegalArgumentException(Handshake.ERROR);
 		}
 	}
 
@@ -100,7 +100,7 @@ public class Handshake {
 			return finalizeHandshakeWithView(toView, response);
 		}
 		else {
-			throw new IOException(ERROR);
+			throw new IOException(Handshake.ERROR);
 		}
 	}
 
@@ -114,7 +114,7 @@ public class Handshake {
 			return true;
 		}
 		else {
-			throw new IllegalArgumentException(ERROR);
+			throw new IllegalArgumentException(Handshake.ERROR);
 		}
 	}
 }

@@ -12,6 +12,7 @@ public class ConfigData {
 	private static String controllerIp;
 	private static int controllerPort;
 	private static String logsPath;
+	private static int timeoutInSeconds;
 	
 	private ConfigData() {}
 
@@ -35,6 +36,10 @@ public class ConfigData {
 		return ConfigData.logsPath;
 	}
 	
+	public static int getTimeoutInSeconds() {
+		return ConfigData.timeoutInSeconds;
+	}
+	
 	public static boolean initConfigData(String configFilePath) {
 		try(JsonReader reader = Json.createReader(new FileReader(configFilePath))) {
 			return initData(reader);
@@ -54,6 +59,7 @@ public class ConfigData {
 		ConfigData.controllerIp = config.getString("controller_ip");
 		ConfigData.controllerPort = config.getInt("controller_port");
 		ConfigData.logsPath = config.getString("logs_path");
+		ConfigData.timeoutInSeconds = config.getInt("timeout_in_seconds");
 		
 		return true;
 	}

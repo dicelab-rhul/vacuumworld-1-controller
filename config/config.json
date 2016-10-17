@@ -3,5 +3,5 @@
    "model_port":13337,
    "controller_ip":"127.0.0.1",
    "controller_port":1890,
-   "logs_path":"/home/cloudstrife9999/workspace/VacuumWorldController/logs/"
+   "logs_path":"logs/"
 }
