@@ -64,11 +64,14 @@ public class ControllerServer {
 		Utils.logWithClass(ControllerServer.class.getSimpleName(), "Starting controller server...");
 		
 		ControllerServer.server = new ServerSocket(ConfigData.getControllerPort());
+		Utils.logWithClass(ControllerServer.class.getSimpleName(), "Controller server started.");
 		
 		connectWithModelIfNecessary();
 		waitForViewConnectionIfNecessary();
-		startManagers();
 		
+		Utils.logWithClass(ControllerServer.class.getSimpleName(), "Handshake with Controller and View succesfully completed.");
+		
+		startManagers();
 		startMonitoringLoop();
 		
 		ControllerServer.server.close();
@@ -162,6 +165,8 @@ public class ControllerServer {
 		ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
 		ObjectInputStream input = new ObjectInputStream(socket.getInputStream());
 		
+		Utils.logWithClass(ControllerServer.class.getSimpleName(), "Controller server connected with (presumably the View server) " + socket.getInetAddress().getHostAddress() + ":" + socket.getPort() + ".");
+		
 		HandshakeCodes code = HandshakeCodes.fromString((String) input.readObject());
 		
 		Utils.logWithClass(ControllerServer.class.getSimpleName(), "Received " + (code == null ? null : code.toString()) + " from view.");
@@ -205,6 +210,8 @@ public class ControllerServer {
 		ObjectOutputStream o = new ObjectOutputStream(socket.getOutputStream());
 		ObjectInputStream i = new ObjectInputStream(socket.getInputStream());
 		
+		Utils.logWithClass(ControllerServer.class.getSimpleName(), "Controller server connected with (presumably the Model server) " + socket.getInetAddress().getHostAddress() + ":" + socket.getPort() + ".");
+		
 		checkHandshakeWithModelResult(socket, i, o);
 	}
 
@@ -212,7 +219,7 @@ public class ControllerServer {
 		if(Handshake.attemptHandshakeWithModel(o, i)) {
 			ControllerServer.socketWithModel = socket;
 			ControllerServer.toModelStream = o;
-			ControllerServer.fromModelStream = i;
+			ControllerServer.fromModelStream = i;			
 		}
 		else {
 			socket.close();
