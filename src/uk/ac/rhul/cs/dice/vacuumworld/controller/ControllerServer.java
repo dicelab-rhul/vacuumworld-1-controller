@@ -102,22 +102,19 @@ public class ControllerServer {
 		try {
 			Utils.logWithClass(ControllerServer.class.getSimpleName(), message);
 			
-			ControllerServer.fromModelStream.close();
-			ControllerServer.toModelStream.close();
-			ControllerServer.fromViewStream.close();
-			ControllerServer.toViewStream.close();
-			ControllerServer.socketWithView.close();
-			ControllerServer.socketWithModel.close();
+			Utils.closeInputStreamIfNecessary(ControllerServer.fromModelStream);
+			Utils.closeOutputStreamIfNecessary(ControllerServer.toModelStream);
+			Utils.closeSocketIfNecessary(ControllerServer.socketWithModel);
+			Utils.closeInputStreamIfNecessary(ControllerServer.fromViewStream);
+			Utils.closeOutputStreamIfNecessary(ControllerServer.toViewStream);
+			Utils.closeSocketIfNecessary(ControllerServer.socketWithView);
 			
 			ControllerServer.executor.shutdownNow();
-			ControllerServer.executor.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
+			ControllerServer.executor.awaitTermination(5, TimeUnit.SECONDS);
 			Utils.logWithClass(ControllerServer.class.getSimpleName(), "Done.");
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-		}
-		catch (IOException e) {
-			Utils.log(e);
 		}
 	}
 

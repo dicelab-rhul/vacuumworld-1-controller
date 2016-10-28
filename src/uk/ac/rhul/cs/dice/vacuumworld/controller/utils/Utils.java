@@ -2,6 +2,9 @@ package uk.ac.rhul.cs.dice.vacuumworld.controller.utils;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.Socket;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -16,9 +19,8 @@ public class Utils {
 	private static Logger initLogger() {
 		Logger logger = Logger.getAnonymousLogger();
 		logger.setUseParentHandlers(false);
-		VacuumWorldLogFormatter formatter = new VacuumWorldLogFormatter();
 		ConsoleHandler handler = new ConsoleHandler();
-		handler.setFormatter(formatter);
+		handler.setFormatter(new VacuumWorldLogFormatter());
 		logger.addHandler(handler);
 		
 		return logger;
@@ -85,6 +87,46 @@ public class Utils {
 		}
 		catch(Exception e) {
 			Utils.log(e);
+		}
+	}
+	
+	public static void closeSocketIfNecessary(Socket socket) {
+		try {
+			if(socket == null) {
+				return;
+			}
+			if(!socket.isClosed()) {
+				socket.close();
+			}
+		}
+		catch(Exception e) {
+			fakeLog(e);
+		}
+	}
+	
+	public static void closeInputStreamIfNecessary(ObjectInputStream input) {
+		if(input == null) {
+			return;
+		}
+		
+		try {
+			input.close();
+		}
+		catch(Exception e) {
+			fakeLog(e);
+		}
+	}
+	
+	public static void closeOutputStreamIfNecessary(ObjectOutputStream output) {
+		if(output == null) {
+			return;
+		}
+		
+		try {
+			output.close();
+		}
+		catch(Exception e) {
+			fakeLog(e);
 		}
 	}
 }
